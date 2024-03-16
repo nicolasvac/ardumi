@@ -1,0 +1,14 @@
+{
+  "device": {
+    "id": "",
+    "cf-version": 1
+  },
+  "http": {
+    "port": 80
+  },
+  "mqtt": {
+    "host": "broker.emqx.io",
+    "id": "ardu-test",
+    "channels": ["ardu-test/test1", "ardu-test/test2"]
+  }
+}
