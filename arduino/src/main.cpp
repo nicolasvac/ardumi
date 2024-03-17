@@ -76,13 +76,138 @@ void restReboot(Request &req, Response &response)
   rebootOnNextLoop = true;
 }
 
-void processIncomingMessage(String topic, String payload)
+String handleCommand(String argument, Commands command)
+{
+  // Prevent cross initialization inside switch
+  String data = "";
+  int pinIndex = -1;
+  int pinValue = -1;
+
+  switch (command)
+  {
+  case Commands::READ_ANALOG:
+    return String(analogRead(argument.toInt()));
+    break;
+  case Commands::READ_DIGITAL:
+    return String(digitalRead(argument.toInt()));
+    break;
+  case Commands::WRITE_DIGITAL:
+    data = StringsHelper::semiSplit(argument, ':', 0);
+
+    if (data == "")
+    {
+      return String(F("ERROR: Invalid digital write pin. Assure the number is an integer"));
+    }
+
+    // Handle the builtin led
+    if (data == "LED_BUILTIN")
+    {
+      pinIndex = LED_BUILTIN;
+    }
+    else
+    {
+      pinIndex = data.toInt();
+    }
+
+    data = StringsHelper::semiSplit(argument, ':', 1);
+
+    if (data == "")
+    {
+      return String(F("ERROR: Invalid digital write value. Assure the number is either 0 or 1"));
+    }
+
+    pinValue = data.toInt();
+
+    switch (pinValue)
+    {
+    case 0:
+      digitalWrite(pinIndex, LOW);
+      break;
+    case 1:
+      digitalWrite(pinIndex, HIGH);
+      break;
+    default:
+      return String(F("ERROR: Invalid digital write value. Assure the number is either 0 or 1"));
+      break;
+    }
+
+    break;
+  case Commands::WRITE_ANALOG:
+    data = StringsHelper::semiSplit(argument, ':', 0);
+
+    if (data == "")
+    {
+      return String(F("ERROR: Invalid analog write pin. Assure the number is an integer"));
+    }
+
+    pinIndex = data.toInt();
+
+    data = StringsHelper::semiSplit(argument, ':', 1);
+
+    if (data == "")
+    {
+      return String(F("ERROR: Invalid analog write value. Assure the number is either 0 or 1"));
+    }
+
+    pinValue = data.toInt();
+
+    analogWrite(pinIndex, pinValue);
+
+    break;
+  default:
+    return String(F("ERROR: Invalid command"));
+    break;
+  }
+
+  return String(F("Success"));
+}
+
+/**
+ * This function handles all the logic for parsing incoming commands to the device.
+ *
+ * @param topic The topic on which the message was sent
+ * @param payload The content of the message
+ */
+String processIncomingMessage(String topic, String payload)
 {
   // Print some basic informations
   Serial.print(F("Received message from topic "));
   Serial.print(topic);
   Serial.print(F(" - content: "));
   Serial.println(payload);
+
+  JsonDocument json;
+
+  DeserializationError error = deserializeJson(json, payload);
+
+  if (error)
+  {
+    return String(F("ERROR: Invalid json received"));
+  }
+
+  String command = json["command"];
+  String arguments = json["arguments"];
+
+  if (command == "READ_DIGITAL")
+  {
+    return handleCommand(arguments, Commands::READ_DIGITAL);
+  }
+  else if (command == "READ_ANALOG")
+  {
+    return handleCommand(arguments, Commands::READ_ANALOG);
+  }
+  else if (command == "WRITE_DIGITAL")
+  {
+    return handleCommand(arguments, Commands::WRITE_DIGITAL);
+  }
+  else if (command == "WRITE_ANALOG")
+  {
+    return handleCommand(arguments, Commands::WRITE_ANALOG);
+  }
+  else
+  {
+    return String(F("ERROR: Invalid command"));
+  }
 }
 
 void mqttProcessMessage(String &topic, String &payload)
@@ -189,6 +314,9 @@ void reboot()
 
 void setup()
 {
+  // Enable the builtin led
+  pinMode(LED_BUILTIN, OUTPUT);
+
   // Open the serial connection
   Serial.begin(SERIAL_CONNECTION_SPEED);
 
@@ -279,7 +407,8 @@ void loop()
   if (Serial.available() > 0)
   {
     String serialData = Serial.readString();
-    processIncomingMessage("SERIAL", serialData);
+    Serial.write(processIncomingMessage("SERIAL", serialData).c_str());
+    Serial.write("\n");
   }
 
   // Check if we need to renew the DHCP address
