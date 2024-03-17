@@ -4,6 +4,7 @@
 
 Application restApp;
 MQTTClient mqttClient;
+// TODO: Verify how to change this with the configuration value
 EthernetServer ethServer(DEFAULT_HTTP_SERVER_PORT);
 EthernetClient ethClient;
 DeviceConfig deviceConfig;
@@ -100,7 +101,7 @@ String handleCommand(String argument, Commands command)
     }
 
     // Handle the builtin led
-    if (data == "LED_BUILTIN")
+    if (data == F("LED_BUILTIN"))
     {
       pinIndex = LED_BUILTIN;
     }
@@ -185,22 +186,22 @@ String processIncomingMessage(String topic, String payload)
     return String(F("ERROR: Invalid json received"));
   }
 
-  String command = json["command"];
-  String arguments = json["arguments"];
+  String command = json[F("command")];
+  String arguments = json[F("arguments")];
 
-  if (command == "READ_DIGITAL")
+  if (command == F("READ_DIGITAL"))
   {
     return handleCommand(arguments, Commands::READ_DIGITAL);
   }
-  else if (command == "READ_ANALOG")
+  else if (command == F("READ_ANALOG"))
   {
     return handleCommand(arguments, Commands::READ_ANALOG);
   }
-  else if (command == "WRITE_DIGITAL")
+  else if (command == F("WRITE_DIGITAL"))
   {
     return handleCommand(arguments, Commands::WRITE_DIGITAL);
   }
-  else if (command == "WRITE_ANALOG")
+  else if (command == F("WRITE_ANALOG"))
   {
     return handleCommand(arguments, Commands::WRITE_ANALOG);
   }
@@ -220,12 +221,12 @@ void mqttAdvertisePresence()
   Serial.println(F("Sending MQTT presence message"));
 
   JsonDocument jsonMessage;
-  jsonMessage["ip"] = Ethernet.localIP();
-  jsonMessage["id"] = deviceConfig.DEVICE_UNIQUE_ID;
-  jsonMessage["http_port"] = deviceConfig.HTTP_SERVER_PORT;
-  jsonMessage["fw_version"] = VERSION;
-  jsonMessage["cf_version"] = deviceConfig.DEVICE_CONFIG_VERSION;
-  jsonMessage["serial_speed"] = SERIAL_CONNECTION_SPEED;
+  jsonMessage[F("ip")] = Ethernet.localIP();
+  jsonMessage[F("id")] = deviceConfig.DEVICE_UNIQUE_ID;
+  jsonMessage[F("http_port")] = deviceConfig.HTTP_SERVER_PORT;
+  jsonMessage[F("fw_version")] = VERSION;
+  jsonMessage[F("cf_version")] = deviceConfig.DEVICE_CONFIG_VERSION;
+  jsonMessage[F("serial_speed")] = SERIAL_CONNECTION_SPEED;
 
   String message = "";
   serializeJson(jsonMessage, message);

@@ -69,7 +69,7 @@ private:
 public:
     /**
      * This function tries to read the device configuration from the EEPROM.
-     * If some error occurs, it resets everything to the default configuration.
+     * If some error occurs, it resets every blank in the EEPROM to the default configuration.
      * It returns the fresh configuration from the EEPROM.
      *
      * @return DeviceConfig
@@ -86,35 +86,26 @@ public:
 
         EEPROM.end();
 
-        // Verify that we have been successfull in reading the configuration.
-        // If we have not, we save the default configuration.
+        // Parse the configuration with the default values in case there are some blanks
+        DeviceConfig parsedConfig = {
+            .DEVICE_UNIQUE_ID = jsonConfig[F("device")][F("id")] | getUniqueId(),
+            .DEVICE_CONFIG_VERSION = jsonConfig[F("device")][F("cf-version")] | CONFIG_VERSION,
+            .HTTP_SERVER_PORT = jsonConfig[F("http")][F("port")] | DEFAULT_HTTP_SERVER_PORT,
+            .MQTT_SERVER_HOST = jsonConfig[F("mqtt")][F("host")] | DEFAULT_MQTT_SERVER_HOST,
+            .MQTT_DEVICE_ID = jsonConfig[F("mqtt")][F("id")] | getUniqueId(),
+            .MQTT_KEEPALIVE = jsonConfig[F("mqtt")][F("keepalive")] | DEFAULT_MQTT_KEEPALIVE,
+            .MQTT_TIMEOUT = jsonConfig[F("mqtt")][F("timeout")] | DEFAULT_MQTT_TIMEOUT,
+            .MQTT_CONNECTION_RETRIES = jsonConfig[F("mqtt")][F("conn_retries")] | DEFAULT_MQTT_CONNECTION_RETRIES,
+        };
+
         if (error)
         {
-            Serial.println(F("Unable to read from EEPROM. Overwriting with default configuration."));
+            Serial.println(F("ERROR: Unable to read from EEPROM correctly. Overwriting configuration with possibly default values"));
 
-            DeviceConfig defaultConfig = getDefaultConfig();
-
-            saveConfig(defaultConfig);
-
-            return defaultConfig;
+            saveConfig(parsedConfig);
         }
-        else
-        {
-            Serial.println(F("Correctly read from EEPROM. Parsing configuration."));
 
-            DeviceConfig parsedConfig = {
-                .DEVICE_UNIQUE_ID = jsonConfig[F("device")][F("id")],
-                .DEVICE_CONFIG_VERSION = jsonConfig[F("device")][F("cf-version")],
-                .HTTP_SERVER_PORT = jsonConfig[F("http")][F("port")],
-                .MQTT_SERVER_HOST = jsonConfig[F("mqtt")][F("host")],
-                .MQTT_DEVICE_ID = jsonConfig[F("mqtt")][F("id")],
-                .MQTT_KEEPALIVE = jsonConfig[F("mqtt")][F("keepalive")],
-                .MQTT_TIMEOUT = jsonConfig[F("mqtt")][F("timeout")],
-                .MQTT_CONNECTION_RETRIES = jsonConfig[F("mqtt")][F("conn_retries")],
-            };
-
-            return parsedConfig;
-        }
+        return parsedConfig;
     };
 
     /**
