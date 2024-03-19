@@ -127,7 +127,7 @@ public:
         Serial.println(F("Saving a new configuration to EEPROM"));
 
         // Clear the content of the EEPROM
-        clearEEPROM();
+        // clearEEPROM();
 
         JsonDocument jsonConfig;
 

@@ -14,7 +14,7 @@
 #endif
 
 #ifndef DEFAULT_MQTT_SERVER_HOST
-#define DEFAULT_MQTT_SERVER_HOST "test.mosquitto.org"
+#define DEFAULT_MQTT_SERVER_HOST "192.168.2.145"
 #define DEFAULT_MQTT_CLIENT_ID "ardumi-test"
 #define DEFAULT_MQTT_KEEPALIVE 15
 #define DEFAULT_MQTT_TIMEOUT 30

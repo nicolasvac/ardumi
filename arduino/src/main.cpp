@@ -7,7 +7,8 @@ Application restApp;
 MQTTClient mqttClient;
 // TODO: Verify how to change this with the configuration value
 EthernetServer ethServer(DEFAULT_HTTP_SERVER_PORT);
-EthernetClient ethClient;
+EthernetClient mqttEthClient;
+EthernetClient httpEthClient;
 
 DeviceConfig deviceConfig;
 DeviceConfigProvider deviceConfigProvider;
@@ -276,6 +277,8 @@ void mqttConnect()
 
     Serial.print(F("ERROR: MQTT was unable to connect to "));
     Serial.println(deviceConfig.MQTT_SERVER_HOST);
+    Serial.print(F("ERROR: MQTT code "));
+    Serial.println(mqttClient.lastError());
     Serial.println(F("Retrying in 2s"));
 
     delay(2000);
@@ -291,7 +294,7 @@ void mqttConnect()
     // Subscribe to the necessary channels
     Serial.println(F("Subscribing to MQTT channels"));
 
-    mqttClient.subscribe("ardu-test/#");
+    mqttClient.subscribe("ardu-test/receive");
 
     Serial.println(F("Successfully subscribed to MQTT channels"));
 
@@ -323,10 +326,10 @@ void reboot()
     mqttClient.disconnect();
   }
 
-  if (ethClient.available())
+  if (httpEthClient.available())
   {
-    ethClient.flush();
-    ethClient.stop();
+    httpEthClient.flush();
+    httpEthClient.stop();
   }
 
   ethServer.flush();
@@ -409,10 +412,10 @@ void setup()
   Serial.print(F("Initializing the MQTT connection to "));
   Serial.println(deviceConfig.MQTT_SERVER_HOST);
 
-  mqttClient.begin(deviceConfig.MQTT_SERVER_HOST.c_str(), ethClient);
-  mqttClient.setKeepAlive(deviceConfig.MQTT_KEEPALIVE);
+  mqttClient.begin(deviceConfig.MQTT_SERVER_HOST.c_str(), mqttEthClient);
+  mqttClient.setKeepAlive(15);
   mqttClient.setCleanSession(true);
-  mqttClient.setTimeout(deviceConfig.MQTT_TIMEOUT);
+  mqttClient.setTimeout(30);
   mqttClient.dropOverflow(true);
   mqttClient.onMessage(mqttProcessMessage);
 
@@ -471,28 +474,28 @@ void loop()
   }
 
   // Receive any HTTP incoming requests
-  ethClient = ethServer.available();
+  httpEthClient = ethServer.available();
 
-  if (ethClient.connected())
+  if (httpEthClient.connected())
   {
     // Initialize a context in order to handle the current request
-    RestContext ethContext = {
-      ip : ethClient.remoteIP(),
+    RestContext httpEthContext = {
+      ip : httpEthClient.remoteIP(),
     };
 
     Serial.print(F("Received an HTTP request from "));
-    Serial.print(ethContext.ip);
+    Serial.print(httpEthContext.ip);
     Serial.print(F(" for path "));
-    Serial.print(ethContext.path);
+    Serial.print(httpEthContext.path);
     Serial.println(F(" - processing now"));
 
     // Process the request
-    restApp.process(&ethClient, &ethContext);
+    restApp.process(&httpEthClient, &httpEthContext);
 
     Serial.println(F("Done processing HTTP request"));
 
     // Close the connection
-    ethClient.stop();
+    httpEthClient.stop();
   }
 
   // Connect the MQTT client in case we are not connected
