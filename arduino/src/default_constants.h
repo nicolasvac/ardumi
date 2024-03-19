@@ -1,8 +1,8 @@
+#pragma once
+
 #ifndef VERSION
 #define VERSION 1
 #define CONFIG_VERSION 1
-#define EEPROM_START 0
-#define EEPROM_END 1024
 #endif
 
 #ifndef SERIAL_CONNECTION_SPEED
@@ -18,5 +18,5 @@
 #define DEFAULT_MQTT_CLIENT_ID "ardumi-test"
 #define DEFAULT_MQTT_KEEPALIVE 15
 #define DEFAULT_MQTT_TIMEOUT 30
-#define DEFAULT_MQTT_CONNECTION_RETRIES 5
+#define DEFAULT_MQTT_CONNECTION_RETRIES 2
 #endif

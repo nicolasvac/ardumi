@@ -1,9 +1,12 @@
+#pragma once
+
 #include <Arduino.h>
 #include <ArduinoUniqueID.h>
 #include <EEPROM.h>
 #include <StreamUtils.h>
 #include <ArduinoJson.h>
 #include "default_constants.h"
+#include <TaskScheduler.h>
 
 struct DeviceConfig
 {
@@ -37,17 +40,22 @@ private:
         return uniqueId;
     };
 
-    void clearEEPROM(int start, int end)
+    void clearEEPROM()
     {
-        Serial.print(F("Erasing EEPROM from "));
-        Serial.print(start);
-        Serial.print(F(" to "));
-        Serial.println(end);
+        EEPROM.begin();
 
-        for (int i = start; i <= end; i++)
+        int EElength = EEPROM.length();
+
+        Serial.print(F("Erasing EEPROM ... "));
+
+        for (int i = 0; i <= EElength; i++)
         {
-            EEPROM.write(i, 0);
+            EEPROM.write(i, EElength);
         }
+
+        EEPROM.end();
+
+        Serial.println("Done");
     };
 
     DeviceConfig getDefaultConfig()
@@ -81,7 +89,7 @@ public:
         JsonDocument jsonConfig;
 
         // Read the EEPROM content
-        EepromStream eepromStream(EEPROM_START, EEPROM_END);
+        EepromStream eepromStream(0, EEPROM.length());
         DeserializationError error = deserializeJson(jsonConfig, eepromStream);
 
         EEPROM.end();
@@ -119,7 +127,7 @@ public:
         Serial.println(F("Saving a new configuration to EEPROM"));
 
         // Clear the content of the EEPROM
-        clearEEPROM(EEPROM_START, EEPROM_END);
+        clearEEPROM();
 
         JsonDocument jsonConfig;
 
@@ -137,7 +145,7 @@ public:
         // Write inside the EEPROM
         EEPROM.begin();
 
-        EepromStream eepromStream(EEPROM_START, EEPROM_END);
+        EepromStream eepromStream(0, EEPROM.length());
         serializeJson(jsonConfig, eepromStream);
 
         EEPROM.end();

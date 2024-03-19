@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file config.h
  * @author your name (you@domain.com)
@@ -14,7 +16,6 @@
  * https://github.com/lasselukkari/aWOT/blob/master/examples/RequestContext/RequestContext.ino
  */
 
-#include <pins_arduino.h>
 #include <SPI.h>
 #include "boards.h"
 #include <Ethernet.h>
@@ -39,7 +40,9 @@ enum Commands
   READ_ANALOG,
   WRITE_DIGITAL,
   WRITE_ANALOG,
-} commands;
+  RESET,
+  REBOOT,
+};
 
 class StringsHelper
 {

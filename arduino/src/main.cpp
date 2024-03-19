@@ -1,5 +1,6 @@
 #include "config.h"
 #include "device_config.h"
+#include "state.h"
 #include <avr/wdt.h>
 
 Application restApp;
@@ -7,7 +8,17 @@ MQTTClient mqttClient;
 // TODO: Verify how to change this with the configuration value
 EthernetServer ethServer(DEFAULT_HTTP_SERVER_PORT);
 EthernetClient ethClient;
+
 DeviceConfig deviceConfig;
+DeviceConfigProvider deviceConfigProvider;
+
+GlobalStateProvider stateProvider;
+
+Scheduler tasksRunner;
+
+void parseStateChanges();
+
+Task tParseStateChanges(2000, TASK_FOREVER, &parseStateChanges);
 
 /**
  * This variable signals when the device needs
@@ -29,6 +40,7 @@ void restStatus(Request &req, Response &response)
 
   json[F("device")][F("id")] = deviceConfig.DEVICE_UNIQUE_ID;
   json[F("device")][F("version")] = VERSION;
+  json[F("device")][F("free_memory")] = freeMemory();
 
   json[F("http")][F("ip")] = Ethernet.localIP();
   json[F("http")][F("port")] = deviceConfig.HTTP_SERVER_PORT;
@@ -59,22 +71,20 @@ void restStatus(Request &req, Response &response)
 
 void restResetToDefault(Request &req, Response &response)
 {
-  DeviceConfigProvider provider;
+  deviceConfigProvider.resetToDefault();
 
-  provider.resetToDefault();
+  rebootOnNextLoop = true;
 
   response.set("Content-type", "text/plain");
   response.sendStatus(200);
-
-  rebootOnNextLoop = true;
 }
 
 void restReboot(Request &req, Response &response)
 {
+  rebootOnNextLoop = true;
+
   response.set("Content-type", "text/plain");
   response.sendStatus(200);
-
-  rebootOnNextLoop = true;
 }
 
 String handleCommand(String argument, Commands command)
@@ -155,6 +165,13 @@ String handleCommand(String argument, Commands command)
     analogWrite(pinIndex, pinValue);
 
     break;
+  case Commands::REBOOT:
+    rebootOnNextLoop = true;
+    break;
+  case Commands::RESET:
+    deviceConfigProvider.resetToDefault();
+    rebootOnNextLoop = true;
+    break;
   default:
     return String(F("ERROR: Invalid command"));
     break;
@@ -204,6 +221,14 @@ String processIncomingMessage(String topic, String payload)
   else if (command == F("WRITE_ANALOG"))
   {
     return handleCommand(arguments, Commands::WRITE_ANALOG);
+  }
+  else if (command == F("RESET"))
+  {
+    return handleCommand(arguments, Commands::RESET);
+  }
+  else if (command == F("REBOOT"))
+  {
+    return handleCommand(arguments, Commands::REBOOT);
   }
   else
   {
@@ -334,9 +359,7 @@ void setup()
 
   // Read device configuration from EEPROM
   Serial.println(F("Reading device configuration"));
-  DeviceConfigProvider provider;
-
-  deviceConfig = provider.readFromEEprom();
+  deviceConfig = deviceConfigProvider.readFromEEprom();
   Serial.println(F("Configuration loaded successfully"));
 
   Serial.print(F("Device unique id: "));
@@ -394,6 +417,15 @@ void setup()
   mqttClient.onMessage(mqttProcessMessage);
 
   Serial.println(F("MQTT connection initialized"));
+
+  tasksRunner.addTask(tParseStateChanges);
+  tParseStateChanges.enable();
+}
+
+void parseStateChanges()
+{
+  // Parse all the state changes
+  // stateProvider.computeStateChanges(mqttClient, deviceConfig);
 }
 
 void loop()
@@ -404,12 +436,14 @@ void loop()
     reboot();
   }
 
+  // Check if there are tasks that need to be runned
+  tasksRunner.execute();
+
   // Check if we have any serial message incoming
   if (Serial.available() > 0)
   {
     String serialData = Serial.readString();
-    Serial.write(processIncomingMessage("SERIAL", serialData).c_str());
-    Serial.write("\n");
+    Serial.println(processIncomingMessage("SERIAL", serialData).c_str());
   }
 
   // Check if we need to renew the DHCP address
@@ -436,18 +470,8 @@ void loop()
     break;
   }
 
-  // Connect the MQTT client in case we are not connected
-  if (!mqttClient.connected())
-  {
-    Serial.println(F("MQTT is not connected. Initializing MQTT connection process"));
-    mqttConnect();
-  }
-
-  // Receive any MQTT incoming messages
-  mqttClient.loop();
-
   // Receive any HTTP incoming requests
-  EthernetClient ethClient = ethServer.available();
+  ethClient = ethServer.available();
 
   if (ethClient.connected())
   {
@@ -470,4 +494,14 @@ void loop()
     // Close the connection
     ethClient.stop();
   }
+
+  // Connect the MQTT client in case we are not connected
+  if (!mqttClient.connected())
+  {
+    Serial.println(F("MQTT is not connected. Initializing MQTT connection process"));
+    mqttConnect();
+  }
+
+  // Receive any MQTT incoming messages
+  mqttClient.loop();
 }
