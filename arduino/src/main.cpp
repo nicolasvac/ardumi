@@ -413,9 +413,9 @@ void setup()
   Serial.println(deviceConfig.MQTT_SERVER_HOST);
 
   mqttClient.begin(deviceConfig.MQTT_SERVER_HOST.c_str(), mqttEthClient);
-  mqttClient.setKeepAlive(15);
+  mqttClient.setKeepAlive(deviceConfig.MQTT_KEEPALIVE);
   mqttClient.setCleanSession(true);
-  mqttClient.setTimeout(30);
+  mqttClient.setTimeout(deviceConfig.MQTT_TIMEOUT);
   mqttClient.dropOverflow(true);
   mqttClient.onMessage(mqttProcessMessage);
 
