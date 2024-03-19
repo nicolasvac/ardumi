@@ -18,8 +18,10 @@ GlobalStateProvider stateProvider;
 Scheduler tasksRunner;
 
 void parseStateChanges();
+void broadcastMQTTStatus();
 
 Task tParseStateChanges(2000, TASK_FOREVER, &parseStateChanges);
+Task tBroadcastMQTTStatus(30000, TASK_FOREVER, &broadcastMQTTStatus);
 
 /**
  * This variable signals when the device needs
@@ -37,37 +39,8 @@ void restFillContext(Request &req, Response &res)
 
 void restStatus(Request &req, Response &response)
 {
-  JsonDocument json;
-
-  json[F("device")][F("id")] = deviceConfig.DEVICE_UNIQUE_ID;
-  json[F("device")][F("version")] = VERSION;
-  json[F("device")][F("free_memory")] = freeMemory();
-
-  json[F("http")][F("ip")] = Ethernet.localIP();
-  json[F("http")][F("port")] = deviceConfig.HTTP_SERVER_PORT;
-
-  json[F("mqtt")][F("connected")] = mqttClient.connected();
-  json[F("mqtt")][F("host")] = deviceConfig.MQTT_SERVER_HOST;
-  json[F("mqtt")][F("id")] = deviceConfig.MQTT_DEVICE_ID;
-  json[F("mqtt")][F("keepalive")] = deviceConfig.MQTT_KEEPALIVE;
-  json[F("mqtt")][F("timeout")] = deviceConfig.MQTT_TIMEOUT;
-
-  // Read the status of all digital and analog pins
-  for (int i = 0; i < NUM_DIGITAL_PINS; i++)
-  {
-    json[F("digital")][F("values")][i] = digitalRead(i);
-  }
-
-  for (int i = 0; i < NUM_ANALOG_INPUTS; i++)
-  {
-    json[F("analog")][F("values")][i] = analogRead(i);
-  }
-
-  String data = "";
-  serializeJson(json, data);
-
   response.set("Content-Type", "application/json");
-  response.println(data);
+  response.println(stateProvider.generateJsonState(deviceConfig, Ethernet.localIP()));
 }
 
 void restResetToDefault(Request &req, Response &response)
@@ -244,22 +217,9 @@ void mqttProcessMessage(String &topic, String &payload)
 
 void mqttAdvertisePresence()
 {
-  Serial.println(F("Sending MQTT presence message"));
-
-  JsonDocument jsonMessage;
-  jsonMessage[F("ip")] = Ethernet.localIP();
-  jsonMessage[F("id")] = deviceConfig.DEVICE_UNIQUE_ID;
-  jsonMessage[F("http_port")] = deviceConfig.HTTP_SERVER_PORT;
-  jsonMessage[F("fw_version")] = VERSION;
-  jsonMessage[F("cf_version")] = deviceConfig.DEVICE_CONFIG_VERSION;
-  jsonMessage[F("serial_speed")] = SERIAL_CONNECTION_SPEED;
-
-  String message = "";
-  serializeJson(jsonMessage, message);
-
-  mqttClient.publish("ardu-test/advertise", message);
-
-  Serial.println(F("MQTT presence message sent"));
+  mqttClient.publish(
+      "ardu-test/advertise",
+      stateProvider.generateJsonAdvertise(deviceConfig, Ethernet.localIP()));
 }
 
 void mqttConnect()
@@ -423,12 +383,19 @@ void setup()
 
   tasksRunner.addTask(tParseStateChanges);
   tParseStateChanges.enable();
+  tasksRunner.addTask(tBroadcastMQTTStatus);
+  tBroadcastMQTTStatus.enable();
 }
 
 void parseStateChanges()
 {
   // Parse all the state changes
   // stateProvider.computeStateChanges(mqttClient, deviceConfig);
+}
+
+void broadcastMQTTStatus()
+{
+  mqttClient.publish("ardu-test/status", stateProvider.generateJsonState(deviceConfig, Ethernet.localIP()));
 }
 
 void loop()

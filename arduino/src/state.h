@@ -19,8 +19,6 @@ class GlobalStateProvider
 {
 private:
     GlobalState_t state;
-    JsonDocument json;
-    String jsonData = "";
 
     void sendMqttStateChangeMessage(
         MQTTClient client,
@@ -30,23 +28,23 @@ private:
         int previousValue,
         int currentValue)
     {
-        json.clear();
+        JsonDocument json;
 
-        json[F("p")] = pinId;
-        json[F("pv")] = previousValue;
-        json[F("cv")] = currentValue;
+        json[F("pin")] = pinId;
+        json[F("previous")] = previousValue;
+        json[F("current")] = currentValue;
 
         switch (changeType)
         {
         case DIGITAL:
-            json[F("t")] = 1;
+            json[F("type")] = 1;
             break;
         case ANALOG:
             json[F("t")] = 2;
             break;
         }
 
-        jsonData = "";
+        String jsonData = "";
         serializeJson(json, jsonData);
 
         client.publish(mqttTopic, jsonData);
@@ -94,5 +92,48 @@ public:
 
             state.digitalPinsValues[i] = pinCurrentValue;
         }
+    }
+
+    String generateJsonState(DeviceConfig deviceConfig, IPAddress localIp)
+    {
+        JsonDocument json;
+
+        json[F("device")][F("free_memory")] = freeMemory();
+        json[F("device")][F("id")] = deviceConfig.DEVICE_UNIQUE_ID;
+        json[F("device")][F("version")] = VERSION;
+        json[F("device")][F("free_memory")] = freeMemory();
+
+        json[F("http")][F("ip")] = localIp;
+        json[F("http")][F("port")] = deviceConfig.HTTP_SERVER_PORT;
+
+        json[F("mqtt")][F("host")] = deviceConfig.MQTT_SERVER_HOST;
+        json[F("mqtt")][F("id")] = deviceConfig.MQTT_DEVICE_ID;
+        json[F("mqtt")][F("keepalive")] = deviceConfig.MQTT_KEEPALIVE;
+        json[F("mqtt")][F("timeout")] = deviceConfig.MQTT_TIMEOUT;
+
+        for (int i = 0; i < NUM_DIGITAL_PINS; i++)
+        {
+            json[F("digital")][F("values")][i] = state.digitalPinsValues[i];
+        }
+
+        String jsonData = "";
+        serializeJson(json, jsonData);
+        return jsonData;
+    }
+
+    String generateJsonAdvertise(DeviceConfig deviceConfig, IPAddress localIp)
+    {
+        JsonDocument json;
+
+        json[F("id")] = deviceConfig.DEVICE_UNIQUE_ID;
+        json[F("fw_version")] = VERSION;
+        json[F("cf_version")] = deviceConfig.DEVICE_CONFIG_VERSION;
+        json[F("serial_speed")] = SERIAL_CONNECTION_SPEED;
+        json[F("ip")] = localIp;
+        json[F("http_port")] = deviceConfig.HTTP_SERVER_PORT;
+
+        String jsonData = "";
+        serializeJson(json, jsonData);
+        return jsonData;
     }
 };
